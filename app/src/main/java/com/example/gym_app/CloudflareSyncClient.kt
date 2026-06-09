@@ -9,7 +9,8 @@ import java.net.URL
 
 data class CloudflareGymState(
     val workouts: Map<String, WorkoutDay>,
-    val exercises: List<ExerciseDefinition>
+    val exercises: List<ExerciseDefinition>,
+    val updatedAt: Long
 )
 
 data class AuthUser(
@@ -151,7 +152,7 @@ object CloudflareSyncClient {
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
 
         try {
-            val body = buildStateJson(workouts, exercises).toString()
+            val body = AppDataJson.encode(workouts, exercises)
             connection.outputStream.use { output ->
                 output.write(body.toByteArray(Charsets.UTF_8))
             }
@@ -223,105 +224,13 @@ object CloudflareSyncClient {
             nickname = json.optString("nickname", json.getString("username"))
         )
 
-    private fun buildStateJson(
-        workouts: Map<String, WorkoutDay>,
-        exercises: List<ExerciseDefinition>
-    ): JSONObject = JSONObject()
-        .put("exercises", JSONArray().apply {
-            exercises.forEach { exercise ->
-                put(JSONObject()
-                    .put("id", exercise.id)
-                    .put("name", exercise.name)
-                    .put("bodyPart", exercise.bodyPart)
-                    .put("equipment", exercise.equipment)
-                )
-            }
-        })
-        .put("workouts", JSONArray().apply {
-            workouts.values.sortedBy { it.date }.forEach { workout ->
-                put(JSONObject()
-                    .put("date", workout.date)
-                    .put("title", workout.title)
-                    .put("exercises", JSONArray().apply {
-                        workout.exercises.forEach { exercise ->
-                            put(JSONObject()
-                                .put("id", exercise.id)
-                                .put("name", exercise.name)
-                                .put("bodyPart", exercise.bodyPart)
-                                .put("equipment", exercise.equipment)
-                                .put("sets", JSONArray().apply {
-                                    exercise.sets.forEach { set ->
-                                        put(JSONObject()
-                                            .put("id", set.id)
-                                            .put("weight", set.weight)
-                                            .put("reps", set.reps)
-                                            .put("completed", set.completed)
-                                        )
-                                    }
-                                })
-                            )
-                        }
-                    })
-                )
-            }
-        })
-
     private fun parseState(json: JSONObject): CloudflareGymState {
-        val exercises = json.optJSONArray("exercises").toExerciseDefinitions()
-        val workouts = json.optJSONArray("workouts").toWorkoutDays().associateBy { it.date }
-        return CloudflareGymState(workouts = workouts, exercises = exercises)
-    }
-
-    private fun JSONArray?.toExerciseDefinitions(): List<ExerciseDefinition> {
-        if (this == null) return emptyList()
-        return List(length()) { index ->
-            val item = getJSONObject(index)
-            ExerciseDefinition(
-                id = item.optLong("id", System.nanoTime() + index),
-                name = item.optString("name"),
-                bodyPart = item.optString("bodyPart", "其他"),
-                equipment = item.optString("equipment", "其他")
-            )
-        }.filter { it.name.isNotBlank() }
-    }
-
-    private fun JSONArray?.toWorkoutDays(): List<WorkoutDay> {
-        if (this == null) return emptyList()
-        return List(length()) { index ->
-            val item = getJSONObject(index)
-            WorkoutDay(
-                date = item.optString("date"),
-                title = item.optString("title", "训练记录"),
-                exercises = item.optJSONArray("exercises").toWorkoutExercises(index)
-            )
-        }.filter { it.date.isNotBlank() }
-    }
-
-    private fun JSONArray?.toWorkoutExercises(dayIndex: Int): List<WorkoutExercise> {
-        if (this == null) return emptyList()
-        return List(length()) { index ->
-            val item = getJSONObject(index)
-            WorkoutExercise(
-                id = item.optLong("id", System.nanoTime() + dayIndex * 100 + index),
-                name = item.optString("name"),
-                bodyPart = item.optString("bodyPart", "其他"),
-                equipment = item.optString("equipment", "其他"),
-                sets = item.optJSONArray("sets").toSetEntries(dayIndex, index)
-            )
-        }.filter { it.name.isNotBlank() }
-    }
-
-    private fun JSONArray?.toSetEntries(dayIndex: Int, exerciseIndex: Int): List<SetEntry> {
-        if (this == null) return emptyList()
-        return List(length()) { index ->
-            val item = getJSONObject(index)
-            SetEntry(
-                id = item.optLong("id", System.nanoTime() + dayIndex * 1000 + exerciseIndex * 100 + index),
-                weight = item.optString("weight"),
-                reps = item.optString("reps"),
-                completed = item.optBoolean("completed", true)
-            )
-        }
+        val snapshot = AppDataJson.decode(json)
+        return CloudflareGymState(
+            workouts = snapshot.workouts,
+            exercises = snapshot.exercises,
+            updatedAt = json.optLong("updatedAt", 0L)
+        )
     }
 
     private fun JSONArray?.toStringList(): List<String> {

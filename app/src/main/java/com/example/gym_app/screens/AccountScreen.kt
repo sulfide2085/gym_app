@@ -3,6 +3,8 @@ package com.example.gym_app
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,7 +38,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun AccountScreen(
     session: AuthSession,
+    workouts: Map<String, WorkoutDay>,
+    exerciseLibrary: List<ExerciseDefinition>,
     onSessionChange: (AuthSession) -> Unit,
+    onImportData: (AppDataSnapshot) -> Unit,
+    onClearData: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -45,10 +51,45 @@ fun AccountScreen(
     var saveMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var updateMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingUpdate by rememberSaveable { mutableStateOf<AppUpdateInfo?>(null) }
+    var confirmClearData by rememberSaveable { mutableStateOf(false) }
+    var dataMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var autoSync by rememberSaveable { mutableStateOf(true) }
     var denseHistory by rememberSaveable { mutableStateOf(true) }
     val currentVersionCode = rememberVersionCode()
     val currentVersionLabel = rememberVersionLabel()
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+        onResult = { uri ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(AppDataJson.encode(workouts, exerciseLibrary).toByteArray(Charsets.UTF_8))
+                    } ?: error("无法写入文件")
+                }.onSuccess {
+                    dataMessage = "已导出"
+                }.onFailure {
+                    dataMessage = it.message ?: "导出失败"
+                }
+            }
+        }
+    )
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            if (uri != null) {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("无法读取文件")
+                    AppDataJson.decode(text)
+                }.onSuccess { snapshot ->
+                    onImportData(snapshot)
+                    dataMessage = "已导入"
+                }.onFailure {
+                    dataMessage = it.message ?: "导入失败"
+                }
+            }
+        }
+    )
 
     Column(
         modifier = Modifier
@@ -97,6 +138,35 @@ fun AccountScreen(
                 Text("设置", color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 SettingSwitchRow("自动同步", autoSync, onChange = { autoSync = it })
                 SettingSwitchRow("紧凑历史", denseHistory, onChange = { denseHistory = it })
+            }
+        }
+
+        GlassPanel(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("数据", color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IosActionButton(
+                        text = "导出",
+                        modifier = Modifier.weight(1f),
+                        style = IosButtonStyle.Secondary,
+                        onClick = { exportLauncher.launch("gym-data.json") }
+                    )
+                    IosActionButton(
+                        text = "导入",
+                        modifier = Modifier.weight(1f),
+                        style = IosButtonStyle.Secondary,
+                        onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }
+                    )
+                }
+                IosActionButton(
+                    text = "清空数据",
+                    modifier = Modifier.fillMaxWidth(),
+                    style = IosButtonStyle.Destructive,
+                    onClick = { confirmClearData = true }
+                )
+                dataMessage?.let {
+                    Text(it, color = if (it == "已导出" || it == "已导入") AppGreen else Color(0xFFFF3B30), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
@@ -169,6 +239,30 @@ fun AccountScreen(
             }
         )
     }
+
+    if (confirmClearData) {
+        AlertDialog(
+            onDismissRequest = { confirmClearData = false },
+            title = { Text("清空数据", fontWeight = FontWeight.Black, color = AppText) },
+            text = { Text("会清空当前账号的训练记录和动作库，并同步到云端。", color = AppMuted) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClearData = false
+                        onClearData()
+                        dataMessage = "已清空"
+                    }
+                ) {
+                    Text("清空", color = Color(0xFFFF3B30), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearData = false }) {
+                    Text("取消", color = AppBlue, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -217,13 +311,6 @@ private fun rememberVersionLabel(): String {
     val context = LocalContext.current
     return rememberSaveable {
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        val versionName = packageInfo.versionName ?: "1.0"
-        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageInfo.longVersionCode
-        } else {
-            @Suppress("DEPRECATION")
-            packageInfo.versionCode.toLong()
-        }
-        "$versionName ($versionCode)"
+        packageInfo.versionName ?: "1.0"
     }
 }

@@ -2,6 +2,7 @@
 
 import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -82,13 +84,19 @@ fun TimerScreen() {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(if (repeatMode) if (reached) "到点" else "剩余" else "已计时", color = AppMuted, fontWeight = FontWeight.Black)
-                Text(
-                    formatDuration(displayMillis),
-                    fontSize = 76.sp,
-                    lineHeight = 76.sp,
-                    fontWeight = FontWeight.Black,
-                    color = if (reached) AppYellow else AppText
-                )
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val timerFontSize = (maxWidth.value * 0.17f).coerceIn(44f, 76f).sp
+                    Text(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = formatDuration(displayMillis),
+                        fontSize = timerFontSize,
+                        lineHeight = timerFontSize,
+                        fontWeight = FontWeight.Black,
+                        color = if (reached) AppYellow else AppText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                }
                 if (repeatMode) {
                     FlatTextField(value = targetSeconds, onValueChange = { targetSeconds = it.filter(Char::isDigit) }, placeholder = "目标秒数")
                 }

@@ -43,8 +43,12 @@ fun GymBuddyApp() {
     val scope = rememberCoroutineScope()
     var activeTab by rememberSaveable { mutableStateOf(AppTab.Today) }
     var selectedDate by rememberSaveable { mutableStateOf(todayIsoDate()) }
-    var workouts by remember { mutableStateOf(seedWorkouts(selectedDate)) }
-    var exerciseLibrary by remember { mutableStateOf(defaultExerciseLibrary()) }
+    var workouts by remember {
+        mutableStateOf(if (CloudflareConfig.isConfigured) emptyMap() else seedWorkouts(selectedDate))
+    }
+    var exerciseLibrary by remember {
+        mutableStateOf(if (CloudflareConfig.isConfigured) emptyList() else defaultExerciseLibrary())
+    }
     var session by remember { mutableStateOf(CloudflareAuthStore.load(context)) }
     var cloudStateLoaded by rememberSaveable(session?.token) { mutableStateOf(!CloudflareConfig.isConfigured || session == null) }
 
@@ -54,6 +58,8 @@ fun GymBuddyApp() {
                 CloudflareAuthStore.save(context, nextSession)
                 session = nextSession
                 cloudStateLoaded = false
+                workouts = emptyMap()
+                exerciseLibrary = emptyList()
             }
         )
         return
@@ -62,15 +68,12 @@ fun GymBuddyApp() {
     LaunchedEffect(session?.token) {
         val currentSession = session
         if (CloudflareConfig.isConfigured && currentSession != null) {
-            CloudflareSyncClient.fetchState(currentSession.token)?.let { remote ->
-                if (remote.workouts.isNotEmpty()) {
-                    workouts = remote.workouts
-                }
-                if (remote.exercises.isNotEmpty()) {
-                    exerciseLibrary = remote.exercises
-                }
+            val remote = CloudflareSyncClient.fetchState(currentSession.token)
+            if (remote != null) {
+                workouts = remote.workouts
+                exerciseLibrary = remote.exercises
+                cloudStateLoaded = true
             }
-            cloudStateLoaded = true
         }
     }
 
@@ -125,17 +128,27 @@ fun GymBuddyApp() {
                 )
                 AppTab.Account -> AccountScreen(
                     session = requireNotNull(session),
+                    workouts = workouts,
+                    exerciseLibrary = exerciseLibrary,
                     onSessionChange = { nextSession ->
                         CloudflareAuthStore.save(context, nextSession)
                         session = nextSession
+                    },
+                    onImportData = { snapshot ->
+                        workouts = snapshot.workouts
+                        exerciseLibrary = snapshot.exercises
+                    },
+                    onClearData = {
+                        workouts = emptyMap()
+                        exerciseLibrary = emptyList()
                     },
                     onLogout = {
                         val token = session?.token
                         CloudflareAuthStore.clear(context)
                         session = null
                         activeTab = AppTab.Today
-                        workouts = seedWorkouts(selectedDate)
-                        exerciseLibrary = defaultExerciseLibrary()
+                        workouts = if (CloudflareConfig.isConfigured) emptyMap() else seedWorkouts(selectedDate)
+                        exerciseLibrary = if (CloudflareConfig.isConfigured) emptyList() else defaultExerciseLibrary()
                         if (token != null) {
                             scope.launch { CloudflareSyncClient.logout(token) }
                         }
