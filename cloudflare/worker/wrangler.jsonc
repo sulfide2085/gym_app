@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gym-app-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-09",
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gym_app_db",
+      "database_id": "445835ff-4bb8-46ef-ae5b-ce96cc8fae78"
+    }
+  ]
+}

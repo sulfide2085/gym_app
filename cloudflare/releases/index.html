@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gym App</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg-top: #f9fcff;
+      --bg-bottom: #dce7f3;
+      --text: #0f172a;
+      --muted: #475569;
+      --blue: #007aff;
+      --line: rgba(15, 23, 42, .12);
+      --glass: rgba(255, 255, 255, .78);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-rounded, "SF Pro Rounded", "Segoe UI", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, var(--bg-top), #eff4fa 44%, var(--bg-bottom));
+    }
+
+    main {
+      width: min(1080px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 56px 0;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 32px;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(48px, 8vw, 96px);
+      line-height: .94;
+      letter-spacing: 0;
+    }
+
+    .copy {
+      margin: 22px 0 0;
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      padding: 0 24px;
+      border-radius: 18px;
+      background: var(--blue);
+      color: #fff;
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 900;
+      box-shadow: 0 18px 42px rgba(0, 122, 255, .22);
+      transition: transform .15s ease, opacity .15s ease;
+    }
+
+    .button:active {
+      transform: scale(.97);
+      opacity: .82;
+    }
+
+    .ghost {
+      background: var(--glass);
+      color: var(--blue);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .phone {
+      border-radius: 34px;
+      padding: 18px;
+      background: rgba(255, 255, 255, .62);
+      border: 1px solid rgba(255, 255, 255, .88);
+      box-shadow: 0 28px 80px rgba(15, 23, 42, .16);
+    }
+
+    .screen {
+      min-height: 600px;
+      border-radius: 26px;
+      padding: 26px 20px;
+      background: linear-gradient(180deg, #f9fcff, #eaf2fb);
+      border: 1px solid var(--line);
+    }
+
+    .date {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .title {
+      margin-top: 8px;
+      font-size: 36px;
+      line-height: 1;
+      font-weight: 1000;
+    }
+
+    .panel {
+      margin-top: 22px;
+      padding: 16px;
+      border-radius: 26px;
+      background: rgba(255, 255, 255, .82);
+      border: 1px solid rgba(15, 23, 42, .08);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 44px 1fr 44px;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .badge, .trash {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      font-weight: 1000;
+    }
+
+    .badge {
+      background: rgba(0, 122, 255, .14);
+      color: var(--blue);
+    }
+
+    .trash {
+      color: #ff3b30;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .78);
+    }
+
+    .metric {
+      height: 44px;
+      border-radius: 16px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .84);
+      font-size: 18px;
+      font-weight: 1000;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 30px;
+    }
+
+    .feature {
+      min-height: 150px;
+      padding: 18px;
+      border-radius: 24px;
+      background: var(--glass);
+      border: 1px solid rgba(255, 255, 255, .9);
+      box-shadow: 0 18px 50px rgba(15, 23, 42, .08);
+    }
+
+    .feature b {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .feature span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
+    @media (max-width: 820px) {
+      main { padding: 30px 0; }
+      .hero { grid-template-columns: 1fr; }
+      .phone { max-width: 390px; margin: 0 auto; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div>
+        <h1>Gym App</h1>
+        <p class="copy">面向个人训练记录的 Android 应用。记录今日训练、管理动作库、查看日历历史，并通过 Cloudflare 同步你的账户数据。</p>
+        <div class="actions">
+          <a class="button" href="/app-debug.apk">下载 Android APK</a>
+          <a class="button ghost" href="https://gym-app-api.sulfide2085.workers.dev/health">服务状态</a>
+        </div>
+        <div class="features">
+          <div class="feature"><b>今日训练</b><span>快速添加动作组，重量和次数直接编辑，历史数据就在当前动作下方。</span></div>
+          <div class="feature"><b>动作库</b><span>分类管理动作，最近三次训练数据自动聚合展示。</span></div>
+          <div class="feature"><b>云端同步</b><span>账号登录后，训练记录通过 Cloudflare Worker 与 D1 保存。</span></div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <div class="date">2026-06-09</div>
+          <div class="title">今日训练</div>
+          <div class="panel">
+            <b>高位下拉</b>
+            <div class="row">
+              <div class="badge">1</div>
+              <div class="metric"><span>45</span><small>kg x 12</small></div>
+              <div class="trash">⌫</div>
+            </div>
+            <div class="row">
+              <div class="badge">2</div>
+              <div class="metric"><span>50</span><small>kg x 10</small></div>
+              <div class="trash">⌫</div>
+            </div>
+          </div>
+          <div class="panel">
+            <b>最近记录</b>
+            <p class="copy" style="font-size: 14px; margin-top: 10px;">2026-05-29 · 27kg x 10 / 32kg x 10</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

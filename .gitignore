@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+.wrangler/
+cloudflare/releases/app-debug.apk
+agent.md

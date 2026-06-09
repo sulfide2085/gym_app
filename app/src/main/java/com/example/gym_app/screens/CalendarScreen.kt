@@ -16,16 +16,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Calendar
@@ -33,80 +34,78 @@ import java.util.Locale
 
 @Composable
 fun CalendarScreen(
-    todayTitle: String,
-    todayExercises: List<WorkoutExercise>
+    workouts: Map<String, WorkoutDay>,
+    selectedDate: String,
+    onDateSelected: (String) -> Unit,
+    onEditSelectedDate: () -> Unit
 ) {
     val today = Calendar.getInstance()
-    val year = today.get(Calendar.YEAR)
-    val month = today.get(Calendar.MONTH)
-    val todayDay = today.get(Calendar.DAY_OF_MONTH)
-    var selectedDay by rememberSaveable { mutableIntStateOf(todayDay) }
+    val year = selectedDate.substring(0, 4).toIntOrNull() ?: today.get(Calendar.YEAR)
+    val monthNumber = selectedDate.substring(5, 7).toIntOrNull() ?: (today.get(Calendar.MONTH) + 1)
+    val selectedDay = selectedDate.substring(8, 10).toIntOrNull() ?: today.get(Calendar.DAY_OF_MONTH)
     val monthStart = Calendar.getInstance().apply {
         set(Calendar.YEAR, year)
-        set(Calendar.MONTH, month)
+        set(Calendar.MONTH, monthNumber - 1)
         set(Calendar.DAY_OF_MONTH, 1)
     }
     val daysInMonth = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
     val leadingBlanks = monthStart.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
-    val trainingDays = setOf(2, 6, 8, 13, 21, todayDay)
     val calendarCells = List(leadingBlanks) { null } + (1..daysInMonth).map { it }
-    val selectedSummary = buildWorkoutSummary(
-        day = selectedDay,
-        todayDay = todayDay,
-        todayTitle = todayTitle,
-        todayExercises = todayExercises,
-        trainingDays = trainingDays
-    )
+    val monthlyWorkouts = workouts.keys.count { it.startsWith(String.format(Locale.US, "%04d-%02d", year, monthNumber)) }
+    val selectedWorkout = workouts[selectedDate]
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         ScreenHeader(
-            label = "REVIEW",
-            title = String.format(Locale.US, "%04d.%02d", year, month + 1),
-            meta = "${trainingDays.count { it <= daysInMonth }} 天训练"
+            label = "日历",
+            title = String.format(Locale.US, "%04d.%02d", year, monthNumber),
+            meta = "$monthlyWorkouts 天训练记录"
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        MonthSwitcher(
+            onPrevious = { onDateSelected(monthShiftDate(year, monthNumber, -1)) },
+            onToday = { onDateSelected(todayDateString()) },
+            onNext = { onDateSelected(monthShiftDate(year, monthNumber, 1)) }
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             listOf("日", "一", "二", "三", "四", "五", "六").forEach { day ->
-                Text(day, modifier = Modifier.weight(1f), color = AppMuted, fontWeight = FontWeight.Black)
+                Text(
+                    day,
+                    modifier = Modifier.weight(1f),
+                    color = AppMuted,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
             }
         }
         calendarCells.chunked(7).forEach { week ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 week.forEach { day ->
                     if (day == null) {
                         Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
                     } else {
-                        val trained = day in trainingDays
-                        val isToday = day == todayDay
+                        val date = dateString(year, monthNumber, day)
+                        val workout = workouts[date]
+                        val trained = workout?.exercises?.isNotEmpty() == true
                         val isSelected = day == selectedDay
-                        val shape = RoundedCornerShape(18.dp)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(shape)
-                                .background(if (trained) AppGreenSoft else AppGlass, shape)
-                                .border(
-                                    BorderStroke(
-                                        if (isSelected || isToday) 2.dp else 1.dp,
-                                        if (isSelected || isToday) AppBlue else AppLine
-                                    ),
-                                    shape
-                                )
-                                .clickable { selectedDay = day },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "$day",
-                                fontWeight = FontWeight.Black,
-                                color = if (isSelected) AppBlue else if (trained) AppGreen else AppText
-                            )
-                        }
+                        CalendarDayCell(
+                            modifier = Modifier.weight(1f),
+                            day = day,
+                            trained = trained,
+                            selected = isSelected,
+                            onClick = { onDateSelected(date) }
+                        )
                     }
                 }
                 repeat(7 - week.size) {
@@ -115,56 +114,143 @@ fun CalendarScreen(
             }
         }
 
-        DayWorkoutPanel(summary = selectedSummary)
+        DayWorkoutPanel(
+            date = selectedDate,
+            workout = selectedWorkout,
+            onEdit = onEditSelectedDate
+        )
     }
 }
 
 @Composable
-private fun DayWorkoutPanel(summary: DayWorkoutSummary?) {
+private fun MonthSwitcher(
+    onPrevious: () -> Unit,
+    onToday: () -> Unit,
+    onNext: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(onClick = onPrevious) {
+            Text("上月", color = AppBlue, fontWeight = FontWeight.Bold)
+        }
+        TextButton(onClick = onToday) {
+            Text("本月", color = AppMuted, fontWeight = FontWeight.Bold)
+        }
+        TextButton(onClick = onNext) {
+            Text("下月", color = AppBlue, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    modifier: Modifier = Modifier,
+    day: Int,
+    trained: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(shape)
+            .background(if (trained) AppGreenSoft else AppGlass, shape)
+            .border(
+                BorderStroke(
+                    if (selected) 2.dp else 1.dp,
+                    if (selected) AppBlue else AppLine
+                ),
+                shape
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "$day",
+                fontWeight = FontWeight.Black,
+                color = if (selected) AppBlue else if (trained) AppGreen else AppText
+            )
+            if (trained) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 3.dp)
+                        .background(AppGreen, RoundedCornerShape(2.dp))
+                        .fillMaxWidth(0.22f)
+                        .aspectRatio(3f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayWorkoutPanel(
+    date: String,
+    workout: WorkoutDay?,
+    onEdit: () -> Unit
+) {
     GlassPanel(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (summary == null) {
-                Text("当日训练", fontWeight = FontWeight.Black, color = AppText, fontSize = 18.sp)
-                Text("这一天还没有训练记录。", color = AppMuted)
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(date, color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(workout?.title ?: "未安排训练", fontWeight = FontWeight.Black, color = AppText, fontSize = 20.sp)
+                }
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = AppBlue, contentColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    onClick = onEdit
+                ) {
+                    Text("编辑这天", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            if (workout == null || workout.exercises.isEmpty()) {
+                Text("这一天还没有训练内容，点编辑可直接新增。", color = AppMuted)
             } else {
-                Text("${summary.day} 日训练", fontWeight = FontWeight.Black, color = AppText, fontSize = 18.sp)
-                Text(summary.title, color = AppMuted)
-                Text("${summary.completedSets}/${summary.totalSets} 组完成", color = AppGreen, fontWeight = FontWeight.Black)
-                summary.exercises.forEach { name ->
-                    Text("• $name", color = AppText)
+                val totalSets = workout.exercises.sumOf { it.sets.size }
+                Text("${workout.exercises.size} 个动作 · $totalSets 组", color = AppGreen, fontWeight = FontWeight.Black)
+                workout.exercises.chunked(3).forEach { rowExercises ->
+                    HistorySetCardsRow(
+                        cards = rowExercises.map { exercise ->
+                            HistorySetCardData(
+                                title = exercise.name,
+                                sets = exercise.sets
+                            )
+                        }
+                    )
                 }
             }
         }
     }
 }
 
-private fun buildWorkoutSummary(
-    day: Int,
-    todayDay: Int,
-    todayTitle: String,
-    todayExercises: List<WorkoutExercise>,
-    trainingDays: Set<Int>
-): DayWorkoutSummary? {
-    if (day == todayDay) {
-        return DayWorkoutSummary(
-            day = day,
-            title = todayTitle,
-            completedSets = todayExercises.sumOf { exercise -> exercise.sets.count { it.completed } },
-            totalSets = todayExercises.sumOf { it.sets.size },
-            exercises = todayExercises.map { it.name }
-        )
-    }
+private fun dateString(year: Int, monthNumber: Int, day: Int): String =
+    String.format(Locale.US, "%04d-%02d-%02d", year, monthNumber, day)
 
-    if (day !in trainingDays) {
-        return null
+private fun monthShiftDate(year: Int, monthNumber: Int, delta: Int): String {
+    val calendar = Calendar.getInstance().apply {
+        set(Calendar.YEAR, year)
+        set(Calendar.MONTH, monthNumber - 1 + delta)
+        set(Calendar.DAY_OF_MONTH, 1)
     }
+    return dateString(
+        year = calendar.get(Calendar.YEAR),
+        monthNumber = calendar.get(Calendar.MONTH) + 1,
+        day = 1
+    )
+}
 
-    val names = if (day % 2 == 0) listOf("卧推", "高位下拉") else listOf("深蹲", "平板支撑")
-    return DayWorkoutSummary(
-        day = day,
-        title = "历史训练",
-        completedSets = names.size * 2,
-        totalSets = names.size * 2,
-        exercises = names
+private fun todayDateString(): String {
+    val today = Calendar.getInstance()
+    return dateString(
+        year = today.get(Calendar.YEAR),
+        monthNumber = today.get(Calendar.MONTH) + 1,
+        day = today.get(Calendar.DAY_OF_MONTH)
     )
 }
