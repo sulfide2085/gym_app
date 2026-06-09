@@ -1,7 +1,6 @@
 package com.example.gym_app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,13 +62,7 @@ fun ExerciseLibraryScreen(
         ScreenHeader(label = "LIBRARY", title = "全部动作", meta = "${filtered.size}/${exercises.size} 个动作")
         FlatTextField(value = search, onValueChange = { search = it }, placeholder = "搜索动作")
 
-        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            parts.forEach { part ->
-                ModeButton(part, selectedPart == part) {
-                    selectedPart = part
-                }
-            }
-        }
+        PartFilterRows(parts = parts, selectedPart = selectedPart, onSelect = { selectedPart = it })
 
         filtered.forEach { exercise ->
             if (editingId == exercise.id) {

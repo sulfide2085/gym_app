@@ -115,11 +115,15 @@ private fun AddExerciseDialog(
     onSelect: (ExerciseDefinition) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var selectedPart by rememberSaveable { mutableStateOf("全部") }
+    val parts = listOf("全部", "胸部", "背部", "腿部", "肩部", "手臂", "核心", "有氧", "其他")
     val visibleExercises = availableExercises.filter {
-        query.isBlank() ||
+        val matchesPart = selectedPart == "全部" || it.bodyPart == selectedPart
+        val matchesQuery = query.isBlank() ||
             it.name.contains(query) ||
             it.bodyPart.contains(query) ||
             it.equipment.contains(query)
+        matchesPart && matchesQuery
     }
 
     AlertDialog(
@@ -127,7 +131,9 @@ private fun AddExerciseDialog(
         title = { Text("选择动作", fontWeight = FontWeight.Black, color = AppText) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("可添加 ${availableExercises.size} 个动作", color = AppMuted, fontSize = 13.sp)
                 FlatTextField(value = query, onValueChange = { query = it }, placeholder = "搜索动作、部位或器械")
+                PartFilterRows(parts = parts, selectedPart = selectedPart, onSelect = { selectedPart = it })
                 if (availableExercises.isEmpty()) {
                     Text("动作库里的动作都已经加入今日训练。", color = AppMuted)
                 } else if (visibleExercises.isEmpty()) {
