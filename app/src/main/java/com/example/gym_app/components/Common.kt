@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -147,6 +148,7 @@ fun IosActionButton(
     text: String,
     modifier: Modifier = Modifier,
     style: IosButtonStyle = IosButtonStyle.Primary,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(18.dp)
@@ -163,13 +165,14 @@ fun IosActionButton(
         IosButtonStyle.Secondary -> AppBlue
         IosButtonStyle.Destructive -> Color(0xFFFF3B30)
     }
+    val alpha = if (enabled) 1f else 0.4f
     Box(
         modifier = modifier
             .height(54.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                alpha = if (pressed) 0.78f else 1f
+                alpha = if (pressed) 0.78f else alpha
             }
             .clip(shape)
             .background(background, shape)
@@ -177,11 +180,12 @@ fun IosActionButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = enabled,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = textColor, fontSize = 15.sp, fontWeight = FontWeight.Black)
+        Text(text, color = textColor.copy(alpha = alpha), fontSize = 15.sp, fontWeight = FontWeight.Black)
     }
 }
 
@@ -329,7 +333,7 @@ fun HistorySetCardsRow(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().fillMaxHeight(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         cards.take(3).forEach { card ->
@@ -337,11 +341,11 @@ fun HistorySetCardsRow(
                 title = card.title,
                 sets = card.sets,
                 subtitle = card.subtitle,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
         }
         repeat(3 - cards.take(3).size) {
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
         }
     }
 }

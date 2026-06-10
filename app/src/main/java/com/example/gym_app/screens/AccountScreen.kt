@@ -1,7 +1,5 @@
 package com.example.gym_app
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,6 +49,8 @@ fun AccountScreen(
     var saveMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var updateMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingUpdate by rememberSaveable { mutableStateOf<AppUpdateInfo?>(null) }
+    var downloading by rememberSaveable { mutableStateOf(false) }
+    var downloadStatus by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmClearData by rememberSaveable { mutableStateOf(false) }
     var dataMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var autoSync by rememberSaveable { mutableStateOf(true) }
@@ -175,9 +175,10 @@ fun AccountScreen(
                 Text("软件更新", color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text("当前版本 $currentVersionLabel", color = AppText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 IosActionButton(
-                    text = "检查更新",
+                    text = if (downloading) "下载中..." else "检查更新",
                     modifier = Modifier.fillMaxWidth(),
                     style = IosButtonStyle.Secondary,
+                    enabled = !downloading,
                     onClick = {
                         scope.launch {
                             updateMessage = null
@@ -193,6 +194,9 @@ fun AccountScreen(
                 )
                 updateMessage?.let {
                     Text(it, color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                downloadStatus?.let {
+                    Text(it, color = AppBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -225,8 +229,14 @@ fun AccountScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        val url = update.apkUrl
                         pendingUpdate = null
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.apkUrl)))
+                        downloading = true
+                        downloadStatus = "正在下载..."
+                        ApkInstaller.downloadAndInstall(context, url) { status ->
+                            downloadStatus = status
+                            if (status != "正在下载...") downloading = false
+                        }
                     }
                 ) {
                     Text("下载", color = AppBlue, fontWeight = FontWeight.Bold)
