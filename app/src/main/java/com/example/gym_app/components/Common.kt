@@ -165,14 +165,14 @@ fun IosActionButton(
         IosButtonStyle.Secondary -> AppBlue
         IosButtonStyle.Destructive -> Color(0xFFFF3B30)
     }
-    val alpha = if (enabled) 1f else 0.4f
+    val enabledAlpha = if (enabled) 1f else 0.4f
     Box(
         modifier = modifier
             .height(54.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                alpha = if (pressed) 0.78f else alpha
+                alpha = if (pressed) 0.78f else enabledAlpha
             }
             .clip(shape)
             .background(background, shape)
@@ -185,7 +185,7 @@ fun IosActionButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = textColor.copy(alpha = alpha), fontSize = 15.sp, fontWeight = FontWeight.Black)
+        Text(text, color = textColor.copy(alpha = enabledAlpha), fontSize = 15.sp, fontWeight = FontWeight.Black)
     }
 }
 
