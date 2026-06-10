@@ -34,10 +34,10 @@ type ProfileRequest = {
 
 const SESSION_DAYS = 30;
 const PASSWORD_ITERATIONS = 60_000;
-const LATEST_ANDROID_VERSION_CODE = 2;
-const LATEST_ANDROID_VERSION_NAME = "1.1";
+const LATEST_ANDROID_VERSION_CODE = 3;
+const LATEST_ANDROID_VERSION_NAME = "1.2";
 const ANDROID_APK_URL = "https://gym-app-releases.pages.dev/app-debug.apk";
-const RELEASE_NOTES = ["修复新账号错误继承旧样例数据", "我的页新增导入、导出和清空数据", "修复手机计时页数字换行"];
+const RELEASE_NOTES = ["新增 CI/CD 自动构建部署", "更新改为应用内下载安装", "修复按钮禁用状态样式"];
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
