@@ -34,10 +34,10 @@ type ProfileRequest = {
 
 const SESSION_DAYS = 30;
 const PASSWORD_ITERATIONS = 60_000;
-const LATEST_ANDROID_VERSION_CODE = 103;
-const LATEST_ANDROID_VERSION_NAME = "1.3";
+const LATEST_ANDROID_VERSION_CODE = 104;
+const LATEST_ANDROID_VERSION_NAME = "1.4";
 const ANDROID_APK_URL = "https://gym-app-releases.pages.dev/app-debug.apk";
-const RELEASE_NOTES = ["UI: 统一锻炼记录卡片高度"];
+const RELEASE_NOTES = ["新增签名发布支持", "优化训练记录与调试流程"];
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
