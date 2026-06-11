@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,18 +14,20 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,6 +43,7 @@ fun CalendarScreen(
     onEditSelectedDate: () -> Unit
 ) {
     val today = Calendar.getInstance()
+    val todayString = todayDateString()
     val year = selectedDate.substring(0, 4).toIntOrNull() ?: today.get(Calendar.YEAR)
     val monthNumber = selectedDate.substring(5, 7).toIntOrNull() ?: (today.get(Calendar.MONTH) + 1)
     val selectedDay = selectedDate.substring(8, 10).toIntOrNull() ?: today.get(Calendar.DAY_OF_MONTH)
@@ -51,8 +55,13 @@ fun CalendarScreen(
     val daysInMonth = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
     val leadingBlanks = monthStart.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
     val calendarCells = List(leadingBlanks) { null } + (1..daysInMonth).map { it }
-    val monthlyWorkouts = workouts.keys.count { it.startsWith(String.format(Locale.US, "%04d-%02d", year, monthNumber)) }
+    val monthlyWorkouts = workouts.keys.count {
+        it.startsWith(String.format(Locale.US, "%04d-%02d", year, monthNumber))
+    }
     val selectedWorkout = workouts[selectedDate]
+    val switchMonth: (Int) -> Unit = { delta ->
+        onDateSelected(monthShiftDate(year, monthNumber, delta))
+    }
 
     Column(
         modifier = Modifier
@@ -67,10 +76,58 @@ fun CalendarScreen(
             meta = "$monthlyWorkouts 天训练记录"
         )
         MonthSwitcher(
-            onPrevious = { onDateSelected(monthShiftDate(year, monthNumber, -1)) },
-            onToday = { onDateSelected(todayDateString()) },
-            onNext = { onDateSelected(monthShiftDate(year, monthNumber, 1)) }
+            onPrevious = { switchMonth(-1) },
+            onToday = { onDateSelected(todayString) },
+            onNext = { switchMonth(1) }
         )
+        CalendarMonthGrid(
+            year = year,
+            monthNumber = monthNumber,
+            selectedDay = selectedDay,
+            todayString = todayString,
+            calendarCells = calendarCells,
+            workouts = workouts,
+            onDateSelected = onDateSelected,
+            onMonthSwipe = switchMonth
+        )
+        DayWorkoutPanel(
+            date = selectedDate,
+            workout = selectedWorkout,
+            onEdit = onEditSelectedDate
+        )
+    }
+}
+
+@Composable
+private fun CalendarMonthGrid(
+    year: Int,
+    monthNumber: Int,
+    selectedDay: Int,
+    todayString: String,
+    calendarCells: List<Int?>,
+    workouts: Map<String, WorkoutDay>,
+    onDateSelected: (String) -> Unit,
+    onMonthSwipe: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier.pointerInput(year, monthNumber) {
+            var totalDrag = 0f
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { _, dragAmount ->
+                    totalDrag += dragAmount
+                },
+                onDragEnd = {
+                    when {
+                        totalDrag <= -80f -> onMonthSwipe(1)
+                        totalDrag >= 80f -> onMonthSwipe(-1)
+                    }
+                    totalDrag = 0f
+                },
+                onDragCancel = { totalDrag = 0f }
+            )
+        },
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -86,6 +143,7 @@ fun CalendarScreen(
                 )
             }
         }
+
         calendarCells.chunked(7).forEach { week ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -98,12 +156,12 @@ fun CalendarScreen(
                         val date = dateString(year, monthNumber, day)
                         val workout = workouts[date]
                         val trained = workout?.exercises?.isNotEmpty() == true
-                        val isSelected = day == selectedDay
                         CalendarDayCell(
                             modifier = Modifier.weight(1f),
                             day = day,
                             trained = trained,
-                            selected = isSelected,
+                            selected = day == selectedDay,
+                            isToday = date == todayString,
                             onClick = { onDateSelected(date) }
                         )
                     }
@@ -113,12 +171,6 @@ fun CalendarScreen(
                 }
             }
         }
-
-        DayWorkoutPanel(
-            date = selectedDate,
-            workout = selectedWorkout,
-            onEdit = onEditSelectedDate
-        )
     }
 }
 
@@ -151,6 +203,7 @@ private fun CalendarDayCell(
     day: Int,
     trained: Boolean,
     selected: Boolean,
+    isToday: Boolean,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(16.dp)
@@ -184,6 +237,22 @@ private fun CalendarDayCell(
                         .aspectRatio(3f)
                 )
             }
+            if (isToday) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .size(width = 18.dp, height = 14.dp)
+                        .background(if (selected) AppBlue else AppText, RoundedCornerShape(7.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "今",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
         }
     }
 }
@@ -199,7 +268,12 @@ private fun DayWorkoutPanel(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(date, color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(workout?.title ?: "未安排训练", fontWeight = FontWeight.Black, color = AppText, fontSize = 20.sp)
+                    Text(
+                        workout?.title ?: "未安排训练",
+                        fontWeight = FontWeight.Black,
+                        color = AppText,
+                        fontSize = 20.sp
+                    )
                 }
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = AppBlue, contentColor = Color.White),

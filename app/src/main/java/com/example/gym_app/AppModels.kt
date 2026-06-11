@@ -27,7 +27,8 @@ data class ExerciseDefinition(
     val id: Long,
     val name: String,
     val bodyPart: String,
-    val equipment: String
+    val equipment: String,
+    val isStretching: Boolean = false
 )
 
 data class WorkoutDay(
@@ -133,19 +134,32 @@ fun recentWorkoutsForExercise(
     .sortedByDescending { it.date }
     .take(limit)
 
-fun bestSetLabel(exercise: WorkoutExercise): String {
-    val best = exercise.sets.maxByOrNull { set ->
-        (set.weight.toDoubleOrNull() ?: 0.0) * (set.reps.toIntOrNull() ?: 0)
+fun bestSetLabel(exercise: WorkoutExercise, isStretching: Boolean = false): String {
+    val best = if (isStretching) {
+        exercise.sets.maxByOrNull { set -> set.reps.toIntOrNull() ?: 0 }
+    } else {
+        exercise.sets.maxByOrNull { set ->
+            (set.weight.toDoubleOrNull() ?: 0.0) * (set.reps.toIntOrNull() ?: 0)
+        }
     } ?: return "无数据"
-    val weight = best.weight.removeSuffix(".0")
-    return "${weight}kg x ${best.reps}"
+    return if (isStretching) {
+        "${best.reps}秒"
+    } else {
+        val weight = best.weight.removeSuffix(".0")
+        "${weight}kg x ${best.reps}"
+    }
 }
 
-fun fullSetsLabel(exercise: WorkoutExercise): String =
+fun fullSetsLabel(exercise: WorkoutExercise, isStretching: Boolean = false): String =
     exercise.sets.joinToString(" / ") { set ->
-        val weight = set.weight.removeSuffix(".0").ifBlank { "-" }
-        val reps = set.reps.ifBlank { "-" }
-        "${weight}kg x $reps"
+        if (isStretching) {
+            val reps = set.reps.ifBlank { "-" }
+            "${reps}秒"
+        } else {
+            val weight = set.weight.removeSuffix(".0").ifBlank { "-" }
+            val reps = set.reps.ifBlank { "-" }
+            "${weight}kg x $reps"
+        }
     }.ifBlank { "无组数据" }
 
 private fun workoutExercise(

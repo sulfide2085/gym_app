@@ -192,7 +192,13 @@ private fun ExerciseRow(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(exercise.name, fontWeight = FontWeight.Black, color = AppText, lineHeight = 20.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(exercise.name, fontWeight = FontWeight.Black, color = AppText, lineHeight = 20.sp)
+                            if (exercise.isStretching) {
+                                Spacer(Modifier.width(6.dp))
+                                Text("拉伸", color = AppBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                         Text("${exercise.bodyPart} / ${exercise.equipment}", color = AppMuted, fontSize = 12.sp, lineHeight = 16.sp)
                     }
                 }
@@ -257,6 +263,7 @@ private fun ExerciseFormDialog(
     var name by rememberSaveable(initial.id) { mutableStateOf(initial.name) }
     var bodyPart by rememberSaveable(initial.id) { mutableStateOf(initial.bodyPart) }
     var equipment by rememberSaveable(initial.id) { mutableStateOf(initial.equipment) }
+    var isStretching by rememberSaveable(initial.id) { mutableStateOf(initial.isStretching) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -268,6 +275,22 @@ private fun ExerciseFormDialog(
                 OptionRows(options = BodyPartOptions, selected = bodyPart, onSelect = { bodyPart = it })
                 Text("器械", color = AppMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 OptionRows(options = EquipmentOptions, selected = equipment, onSelect = { equipment = it })
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("拉伸动作", color = AppText, fontWeight = FontWeight.Bold)
+                        Text("开启后无需输入重量", color = AppMuted, fontSize = 12.sp)
+                    }
+                    ModeButton(
+                        text = if (isStretching) "是" else "否",
+                        selected = isStretching,
+                        modifier = Modifier.weight(1f),
+                        onClick = { isStretching = !isStretching }
+                    )
+                }
             }
         },
         confirmButton = {
@@ -275,7 +298,7 @@ private fun ExerciseFormDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = AppBlue, contentColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
                 onClick = {
-                    onSave(initial.copy(name = name.trim(), bodyPart = bodyPart, equipment = equipment))
+                    onSave(initial.copy(name = name.trim(), bodyPart = bodyPart, equipment = equipment, isStretching = isStretching))
                 }
             ) {
                 Text("保存", fontWeight = FontWeight.Bold)

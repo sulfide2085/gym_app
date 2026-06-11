@@ -21,6 +21,7 @@ object AppDataJson {
                     .put("name", exercise.name)
                     .put("bodyPart", exercise.bodyPart)
                     .put("equipment", exercise.equipment)
+                    .put("isStretching", exercise.isStretching)
                 )
             }
         })
@@ -75,7 +76,8 @@ object AppDataJson {
                 id = item.optLong("id", System.nanoTime() + index),
                 name = item.optString("name"),
                 bodyPart = item.optString("bodyPart", "其他"),
-                equipment = item.optString("equipment", "其他")
+                equipment = item.optString("equipment", "其他"),
+                isStretching = item.optBoolean("isStretching", false)
             )
         }.filter { it.name.isNotBlank() }
     }

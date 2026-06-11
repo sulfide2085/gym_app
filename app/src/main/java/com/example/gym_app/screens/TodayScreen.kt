@@ -70,15 +70,22 @@ fun TodayScreen(
         FlatTextField(value = title, onValueChange = onTitleChange, placeholder = "训练标题")
 
         exercises.forEachIndexed { exerciseIndex, exercise ->
+            val isStretching = library.any { it.name == exercise.name && it.isStretching }
             ExerciseEditorBlock(
                 exercise = exercise,
+                isStretching = isStretching,
                 recentDays = recentWorkoutsForExercise(history, exercise.name, limit = 4)
                     .filterNot { it.date == date }
                     .take(3),
                 onAddSet = {
                     onExercisesChange(
                         exercises.updateAt(exerciseIndex) {
-                            it.copy(sets = it.sets + SetEntry(id = System.nanoTime()))
+                            val last = it.sets.lastOrNull()
+                            it.copy(sets = it.sets + SetEntry(
+                                id = System.nanoTime(),
+                                weight = if (isStretching) "" else (last?.weight ?: ""),
+                                reps = last?.reps ?: ""
+                            ))
                         }
                     )
                 },
@@ -197,7 +204,13 @@ private fun AddExerciseDialog(
                                     ExerciseInitial(exercise.bodyPart)
                                     Spacer(Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(exercise.name, fontWeight = FontWeight.Black, color = AppText)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(exercise.name, fontWeight = FontWeight.Black, color = AppText)
+                                            if (exercise.isStretching) {
+                                                Spacer(Modifier.width(6.dp))
+                                                Text("拉伸", color = AppBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                         Text("${exercise.bodyPart} / ${exercise.equipment}", color = AppMuted, fontSize = 12.sp)
                                     }
                                 }
@@ -218,6 +231,7 @@ private fun AddExerciseDialog(
 @Composable
 private fun ExerciseEditorBlock(
     exercise: WorkoutExercise,
+    isStretching: Boolean,
     recentDays: List<WorkoutDay>,
     onAddSet: () -> Unit,
     onUpdateSet: (Int, SetEntry) -> Unit,
@@ -252,6 +266,7 @@ private fun ExerciseEditorBlock(
                     SetEditorRow(
                         index = index + 1,
                         set = set,
+                        isStretching = isStretching,
                         onWeightChange = {
                             onUpdateSet(index, set.copy(weight = it.filter { char -> char.isDigit() || char == '.' }))
                         },
@@ -304,6 +319,7 @@ private fun ExerciseEditorBlock(
 private fun SetEditorRow(
     index: Int,
     set: SetEntry,
+    isStretching: Boolean,
     onWeightChange: (String) -> Unit,
     onRepsChange: (String) -> Unit,
     onRemove: () -> Unit
@@ -326,16 +342,18 @@ private fun SetEditorRow(
         ) {
             Text("$index", color = AppBlue, fontSize = 14.sp, fontWeight = FontWeight.Black)
         }
-        SetValuePill(
-            value = set.weight,
-            unit = "kg",
-            keyboardType = KeyboardType.Decimal,
-            modifier = Modifier.weight(1f),
-            onValueChange = onWeightChange
-        )
+        if (!isStretching) {
+            SetValuePill(
+                value = set.weight,
+                unit = "kg",
+                keyboardType = KeyboardType.Decimal,
+                modifier = Modifier.weight(1f),
+                onValueChange = onWeightChange
+            )
+        }
         SetValuePill(
             value = set.reps,
-            unit = "次",
+            unit = if (isStretching) "秒" else "次",
             keyboardType = KeyboardType.Number,
             modifier = Modifier.weight(1f),
             onValueChange = onRepsChange

@@ -16,3 +16,8 @@ local.properties
 .wrangler/
 cloudflare/releases/app-debug.apk
 agent.md
+keystore.properties
+*.jks
+*.keystore
+/keystore/
+node_modules/

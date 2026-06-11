@@ -410,9 +410,9 @@ fun TrashCanIcon(
 }
 
 private fun SetEntry.historyValueText(): String {
-    val weight = weight.removeSuffix(".0").ifBlank { "-" }
-    val reps = reps.ifBlank { "-" }
-    return "${weight}kg x $reps"
+    val w = weight.removeSuffix(".0")
+    val r = reps.ifBlank { "-" }
+    return if (w.isBlank()) "${r}秒" else "${w}kg x $r"
 }
 
 fun formatDuration(milliseconds: Long): String {

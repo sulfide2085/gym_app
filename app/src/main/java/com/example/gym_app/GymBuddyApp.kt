@@ -43,44 +43,84 @@ fun GymBuddyApp() {
     val scope = rememberCoroutineScope()
     var activeTab by rememberSaveable { mutableStateOf(AppTab.Today) }
     var selectedDate by rememberSaveable { mutableStateOf(todayIsoDate()) }
-    var workouts by remember {
-        mutableStateOf(if (CloudflareConfig.isConfigured) emptyMap() else seedWorkouts(selectedDate))
-    }
-    var exerciseLibrary by remember {
-        mutableStateOf(if (CloudflareConfig.isConfigured) emptyList() else defaultExerciseLibrary())
-    }
+    var workouts by remember { mutableStateOf(emptyMap<String, WorkoutDay>()) }
+    var exerciseLibrary by remember { mutableStateOf(emptyList<ExerciseDefinition>()) }
+    var localDataLoaded by rememberSaveable { mutableStateOf(false) }
     var session by remember { mutableStateOf(CloudflareAuthStore.load(context)) }
-    var cloudStateLoaded by rememberSaveable(session?.token) { mutableStateOf(!CloudflareConfig.isConfigured || session == null) }
+    var cloudSynced by rememberSaveable(session?.token) { mutableStateOf(false) }
 
-    if (CloudflareConfig.isConfigured && session == null) {
+    // Step 1: Load from local database immediately
+    LaunchedEffect(Unit) {
+        val localWorkouts = GymLocalStore.loadWorkouts(context)
+        val localExercises = GymLocalStore.loadExercises(context)
+        if (localWorkouts.isNotEmpty()) {
+            workouts = localWorkouts
+        }
+        if (localExercises.isNotEmpty()) {
+            exerciseLibrary = localExercises
+        } else {
+            // First launch: seed default data to local DB
+            val seed = seedWorkouts(selectedDate)
+            val defaults = defaultExerciseLibrary()
+            workouts = seed
+            exerciseLibrary = defaults
+            GymLocalStore.saveAllWorkouts(context, seed)
+            GymLocalStore.saveExercises(context, defaults)
+        }
+        localDataLoaded = true
+    }
+
+    if (CloudflareConfig.isConfigured && session == null && localDataLoaded) {
         AuthScreen(
             onAuthenticated = { nextSession ->
                 CloudflareAuthStore.save(context, nextSession)
                 session = nextSession
-                cloudStateLoaded = false
-                workouts = emptyMap()
-                exerciseLibrary = emptyList()
+                cloudSynced = false
             }
         )
         return
     }
 
-    LaunchedEffect(session?.token) {
+    // Step 2: Sync from cloud (merge with local)
+    LaunchedEffect(session?.token, localDataLoaded) {
         val currentSession = session
-        if (CloudflareConfig.isConfigured && currentSession != null) {
+        if (CloudflareConfig.isConfigured && currentSession != null && localDataLoaded) {
             val remote = CloudflareSyncClient.fetchState(currentSession.token)
             if (remote != null) {
-                workouts = remote.workouts
+                // Merge: prefer newer data per day
+                val merged = remote.workouts.toMutableMap()
+                workouts.forEach { (date, local) ->
+                    val existing = merged[date]
+                    if (existing == null || local.exercises.size > existing.exercises.size) {
+                        merged[date] = local
+                    }
+                }
+                workouts = merged
                 exerciseLibrary = remote.exercises
-                cloudStateLoaded = true
+                // Persist merged result locally
+                GymLocalStore.saveAllWorkouts(context, workouts)
+                GymLocalStore.saveExercises(context, exerciseLibrary)
             }
+            cloudSynced = true
         }
     }
 
-    LaunchedEffect(workouts, exerciseLibrary, cloudStateLoaded) {
+    // Step 3a: Save locally on every change
+    LaunchedEffect(workouts, exerciseLibrary, localDataLoaded) {
+        if (!localDataLoaded) return@LaunchedEffect
+        GymLocalStore.saveAllWorkouts(context, workouts)
+        GymLocalStore.saveExercises(context, exerciseLibrary)
+    }
+
+    // Step 3b: Sync to cloud every 5 minutes (first sync immediately after login)
+    LaunchedEffect(session?.token, cloudSynced, localDataLoaded) {
         val currentSession = session
-        if (CloudflareConfig.isConfigured && cloudStateLoaded && currentSession != null) {
-            delay(900)
+        if (!CloudflareConfig.isConfigured || !cloudSynced || currentSession == null || !localDataLoaded) return@LaunchedEffect
+        // Immediate sync after login
+        CloudflareSyncClient.saveState(currentSession.token, workouts, exerciseLibrary)
+        // Then every 5 minutes
+        while (true) {
+            delay(5 * 60 * 1000L)
             CloudflareSyncClient.saveState(currentSession.token, workouts, exerciseLibrary)
         }
     }
@@ -137,10 +177,18 @@ fun GymBuddyApp() {
                     onImportData = { snapshot ->
                         workouts = snapshot.workouts
                         exerciseLibrary = snapshot.exercises
+                        scope.launch {
+                            GymLocalStore.saveAllWorkouts(context, snapshot.workouts)
+                            GymLocalStore.saveExercises(context, snapshot.exercises)
+                        }
                     },
                     onClearData = {
                         workouts = emptyMap()
                         exerciseLibrary = emptyList()
+                        scope.launch {
+                            GymLocalStore.saveAllWorkouts(context, emptyMap())
+                            GymLocalStore.saveExercises(context, emptyList())
+                        }
                     },
                     onLogout = {
                         val token = session?.token
