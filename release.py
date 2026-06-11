@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +21,20 @@ def step(message: str) -> None:
 
 def run(cmd: list[str], cwd: Path | None = None) -> None:
     subprocess.run(cmd, cwd=cwd or PROJECT_ROOT, check=True)
+
+
+def resolve_executable(name: str) -> str:
+    candidates = [name]
+    if os.name == "nt" and not name.lower().endswith(".cmd"):
+        candidates.insert(0, f"{name}.cmd")
+        candidates.insert(1, f"{name}.exe")
+
+    for candidate in candidates:
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+
+    return name
 
 
 def read_text(path: Path) -> str:
@@ -113,6 +128,28 @@ def release_output_path() -> Path:
     return signed if signed.exists() else unsigned
 
 
+def deploy_release_apk_to_pages() -> None:
+    output = release_output_path()
+    if not output.exists():
+        raise SystemExit(f"Release APK not found: {output}")
+
+    releases_dir = PROJECT_ROOT / "cloudflare" / "releases"
+    releases_dir.mkdir(parents=True, exist_ok=True)
+    target = releases_dir / "app-debug.apk"
+    shutil.copyfile(output, target)
+
+    step("Deploying signed APK to Cloudflare Pages")
+    run(
+        [
+            resolve_executable("wrangler"),
+            "pages",
+            "deploy",
+            str(releases_dir),
+            "--project-name=gym-app-releases",
+        ]
+    )
+
+
 def build(variant: str) -> None:
     task = "assembleRelease" if variant == "release" else "assembleDebug"
     step(f"Building {variant} APK")
@@ -204,7 +241,10 @@ def publish(version: str, notes: list[str]) -> None:
     run(["git", "push", "origin", "main"])
 
     step("Deploying Cloudflare Worker")
-    run(["npx", "wrangler", "deploy"], cwd=PROJECT_ROOT / "cloudflare" / "worker")
+    run([resolve_executable("wrangler"), "deploy"], cwd=PROJECT_ROOT / "cloudflare" / "worker")
+
+    build("release")
+    deploy_release_apk_to_pages()
 
     print(f"\nRelease complete: v{version_name}")
     print("CI will build the APK and deploy Cloudflare Pages.")
